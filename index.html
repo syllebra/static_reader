@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB Reader — Enhanced</title>
+
+    <!-- EPUB.js Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Library View */
+        .library {
+            padding: 20px;
+            overflow-y: auto;
+            height: 100vh;
+        }
+
+        .library-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #333;
+        }
+
+        .library-header h1 {
+            font-size: 32px;
+            color: #fff;
+        }
+
+        .upload-btn {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s, transform 0.15s;
+        }
+
+        .upload-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .book-card {
+            background: #252525;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: transform 0.25s cubic-bezier(.2, .9, .2, 1), box-shadow 0.25s;
+            position: relative;
+        }
+
+        .book-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        .book-cover {
+            width: 100%;
+            height: 280px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .book-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .book-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .book-author {
+            font-size: 14px;
+            color: #999;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .book-card:hover .delete-btn {
+            opacity: 1;
+        }
+
+        /* Reader View */
+        .reader {
+            display: none;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .reader.active {
+            display: flex;
+        }
+
+        .reader-header {
+            background: #252525;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+            transition: transform 0.25s, opacity 0.2s;
+        }
+
+        .reader-title {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+            text-align: center;
+        }
+
+        .reader-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-btn {
+            background: #333;
+            color: #e0e0e0;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s, transform 0.12s;
+        }
+
+        .control-btn:hover {
+            background: #444;
+            transform: translateY(-2px);
+        }
+
+        .settings-panel,
+        .toc-panel {
+            position: fixed;
+            top: 0;
+            width: 350px;
+            height: 100vh;
+            background: #2a2a2a;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s;
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .settings-panel {
+            right: 0;
+            transform: translateX(100%);
+        }
+
+        .settings-panel.active {
+            transform: translateX(0);
+        }
+
+        .toc-panel {
+            left: 0;
+            transform: translateX(-100%);
+        }
+
+        .toc-panel.active {
+            transform: translateX(0);
+        }
+
+        .toc-header,
+        .settings-group h3 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .toc-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #333;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.08s;
+            font-size: 14px;
+        }
+
+        .toc-item:hover,
+        .toc-item.active {
+            background: #4CAF50;
+            color: white;
+            transform: translateX(4px);
+        }
+
+        .settings-group {
+            margin-bottom: 25px;
+        }
+
+        .setting-item {
+            margin-bottom: 15px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .setting-item select,
+        .setting-item input[type="range"],
+        .setting-item input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #e0e0e0;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .theme-btn {
+            padding: 8px;
+            border: 2px solid #444;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        .theme-btn.active {
+            border-color: #4CAF50;
+        }
+
+        /* EPUB.js Viewer */
+        #epub-viewer {
+            flex: 1;
+            background: transparent;
+            position: relative;
+            touch-action: pan-y;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .navigation {
+            position: sticky;
+            bottom: 0;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+            background: #252525;
+            padding: 15px;
+            border-top: 1px solid #333;
+            flex-shrink: 0;
+            transition: transform 0.25s, opacity 0.2s;
+        }
+
+        .nav-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.12s;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .nav-btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .page-info {
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(10, 10, 10, 0.6), rgba(10, 10, 10, 0.85));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1500;
+            flex-direction: column;
+            gap: 12px;
+            backdrop-filter: blur(3px);
+        }
+
+        .loading-box {
+            width: 360px;
+            max-width: 90%;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background: #333;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: #4CAF50;
+            transition: width 0.25s ease;
+        }
+
+        /* Fullscreen UI hiding */
+        .reader.fullscreen-hide .reader-header,
+        .reader.fullscreen-hide .navigation,
+        .reader.fullscreen-hide .toc-panel,
+        .reader.fullscreen-hide .settings-panel {
+            display: none !important;
+        }
+
+        /* Click areas overlay for full-screen reading (invisible but catch clicks) */
+        .click-zones {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            z-index: 1400;
+        }
+
+        .zone {
+            flex: 1;
+        }
+
+        @media (max-width:768px) {
+
+            .settings-panel,
+            .toc-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Library View -->
+        <div class="library" id="library">
+            <div class="library-header">
+                <h1>📚 My EPUB Library</h1>
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">+ Upload EPUB</button>
+                <input type="file" id="fileInput" accept=".epub" multiple>
+            </div>
+            <div class="book-grid" id="bookGrid"></div>
+        </div>
+
+        <!-- Reader View -->
+        <div class="reader" id="reader">
+            <div class="reader-header">
+                <button class="control-btn" onclick="closeReader()">← Back to Library</button>
+                <div class="reader-title" id="readerTitle">Book Title</div>
+                <div class="reader-controls">
+                    <button class="control-btn" onclick="toggleLayout()" id="layoutBtn">📖 Two Pages</button>
+                    <button class="control-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+                    <button class="control-btn" onclick="toggleTOC()">📑 Chapters</button>
+                    <button class="control-btn" onclick="toggleSettings()">⚙ Settings</button>
+                </div>
+            </div>
+
+            <div id="epub-viewer"></div>
+
+            <div class="navigation">
+                <button class="nav-btn" id="prevBtn" onclick="previousPage()">← Previous</button>
+                <span class="page-info" id="pageInfo"></span>
+                <button class="nav-btn" id="nextBtn" onclick="nextPage()">Next →</button>
+            </div>
+
+            <div class="toc-panel" id="tocPanel">
+                <div class="toc-header">📑 Table of Contents</div>
+                <div id="tocContent"></div>
+            </div>
+
+            <div class="settings-panel" id="settingsPanel">
+                <div class="settings-group">
+                    <h3>Reading Theme</h3>
+                    <div class="theme-grid">
+                        <button class="theme-btn" data-theme="default" style="background:#fff;color:#000"
+                            onclick="setTheme('default')">Default</button>
+                    
+                        <button class="theme-btn" data-theme="gray" style="background:#d3d3d3;color:#000"
+                            onclick="setTheme('gray')">Gray</button>
+                    
+                        <button class="theme-btn" data-theme="sepia" style="background:#f4e1c2;color:#333"
+                            onclick="setTheme('sepia')">Sepia</button>
+                    
+                        <button class="theme-btn" data-theme="herbe" style="background:#d3e4cd;color:#333"
+                            onclick="setTheme('herbe')">Herbe</button>
+                    
+                        <button class="theme-btn" data-theme="cerise" style="background:#f8d7da;color:#333"
+                            onclick="setTheme('cerise')">Cerise</button>
+                    
+                        <button class="theme-btn" data-theme="ciel" style="background:#bde0fe;color:#333"
+                            onclick="setTheme('ciel')">Ciel</button>
+                    
+                        <button class="theme-btn" data-theme="solarise" style="background:#fff5eb;color:#333"
+                            onclick="setTheme('solarise')">Solarisé</button>
+                    
+                        <button class="theme-btn" data-theme="gruvbox" style="background:#f9f5d7;color:#333"
+                            onclick="setTheme('gruvbox')">Gruvbox</button>
+                    
+                        <button class="theme-btn" data-theme="contraste" style="background:#000;color:#fff"
+                            onclick="setTheme('contraste')">Contraste</button>
+                    
+                        <button class="theme-btn" data-theme="coucher" style="background:#fffaf0;color:#333"
+                            onclick="setTheme('coucher')">Coucher</button>
+                    
+                        <button class="theme-btn" data-theme="nord" style="background:#d8dee9;color:#2e3440"
+                            onclick="setTheme('nord')">Nord</button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Font & Typography</h3>
+                    <div class="setting-item">
+                        <label>Font Family</label>
+                        <select id="fontFamilySelect">
+                            <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">System
+                            </option>
+                            <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
+                            <option value="'Palatino Linotype', 'Book Antiqua', Palatino, serif">Palatino</option>
+                            <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Sans (Helvetica)</option>
+                            <option value="'Courier New', Courier, monospace">Monospace</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Font Size (<span id="fontSizeVal">18</span>px)</label>
+                        <input type="range" id="fontSizeRange" min="12" max="30" value="18">
+                    </div>
+                    <div class="setting-item">
+                        <label>Line Height (<span id="lineHeightVal">1.6</span>)</label>
+                        <input type="range" id="lineHeightRange" min="1" max="2" step="0.05" value="1.6">
+                    </div>
+                    <div class="setting-item">
+                        <button class="control-btn" id="resetFontBtn" type="button">Reset to book CSS</button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Layout & Margin</h3>
+                    <div class="setting-item">
+                        <label>Page Margin</label>
+                        <select id="pageMarginSelect">
+                            <option value="12">Narrow</option>
+                            <option value="20">Normal</option>
+                            <option value="36">Wide</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label>Page Size / Spread</label>
+                        <select id="pageSpreadSelect">
+                            <option value="two">Two Pages</option>
+                            <option value="single">Single Page</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label><input type="checkbox" id="continuousModeCheckbox"> Use continuous (scrolled)
+                            mode</label>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Persistence</h3>
+                    <div class="setting-item">
+                        <label>All settings are saved automatically and restored on next session.</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading overlay -->
+            <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+                <div class="loading-box">
+                    <div id="loadingText">Loading book...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div style="font-size:13px;color:#ccc;margin-top:8px;" id="loadingSub">Please wait</div>
+                </div>
+            </div>
+
+            <!-- Click zones for full-screen reading (invisible) -->
+            <div class="click-zones" id="clickZones" style="pointer-events:none; display:none;">
+                <div class="zone" id="zoneLeft"></div>
+                <div class="zone" id="zoneCenter"></div>
+                <div class="zone" id="zoneRight"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        class EPUBReader {
+            constructor() {
+                this.books = [];
+                this.currentBook = null;
+                this.rendition = null;
+                this.book = null;
+                this.isFullscreen = false;
+                this.layoutMode = 'two-page';
+                this.settings = {
+                    theme: 'default',
+                    fontSize: 18,
+                    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    lineHeight: 1.6,
+                    pageMargin: 20,
+                    twoPageMode: true,
+                    continuous: false
+                };
+                this.db = null;
+                this.loadingInterval = null;
+
+                this.init();
+            }
+
+            loadBooks() {
+                try {
+                    const saved = localStorage.getItem('epubBooks');
+                    if (saved) this.books = JSON.parse(saved);
+                } catch (e) { console.error('Failed to load books:', e); this.books = []; }
+            }
+
+            saveBooks() {
+                try { localStorage.setItem('epubBooks', JSON.stringify(this.books)); } catch (e) { console.error('Failed to save books:', e); }
+            }
+
+            loadSettings() {
+                try {
+                    const saved = localStorage.getItem('epubSettings');
+                    if (saved) this.settings = { ...this.settings, ...JSON.parse(saved) };
+                } catch (e) { console.error('Failed to load settings:', e); }
+            }
+
+            saveSettings() {
+                try { localStorage.setItem('epubSettings', JSON.stringify(this.settings)); } catch (e) { console.error('Failed to save settings:', e); }
+            }
+
+            async init() {
+                await this.initIndexedDB();
+                this.loadSettings();
+                this.renderLibrary();
+                this.setupEventListeners();
+                this.hydrateSettingsUI();
+            }
+
+            async initIndexedDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open('EPUBReaderDB', 1);
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => { this.db = request.result; this.loadBooks(); resolve(); };
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains('epubFiles')) db.createObjectStore('epubFiles', { keyPath: 'id' });
+                    };
+                });
+            }
+
+            setupEventListeners() {
+                document.getElementById('fileInput').addEventListener('change', (e) => this.handleFileUpload(e));
+                document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+                window.addEventListener('resize', () => { if (this.rendition) this.rendition.resize(); });
+
+                // Click handling for full-screen read zones
+                const viewer = document.getElementById('epub-viewer');
+                viewer.addEventListener('click', (e) => this.handleViewerClick(e));
+
+                // settings UI
+                document.getElementById('fontSizeRange').addEventListener('input', (e) => {
+                    document.getElementById('fontSizeVal').textContent = e.target.value;
+                    this.settings.fontSize = Number(e.target.value);
+                    this.saveSettings();
+                    this.applyUserStyles();
+                });
+                document.getElementById('lineHeightRange').addEventListener('input', (e) => {
+                    document.getElementById('lineHeightVal').textContent = e.target.value;
+                    this.settings.lineHeight = Number(e.target.value);
+                    this.saveSettings();
+                    this.applyUserStyles();
+                });
+                document.getElementById('fontFamilySelect').addEventListener('change', (e) => {
+                    this.settings.fontFamily = e.target.value;
+                    this.saveSettings(); this.applyUserStyles();
+                });
+                document.getElementById('pageMarginSelect').addEventListener('change', (e) => {
+                    this.settings.pageMargin = Number(e.target.value);
+                    this.saveSettings(); this.applyUserStyles();
+                });
+                document.getElementById('pageSpreadSelect').addEventListener('change', (e) => {
+                    this.layoutMode = e.target.value === 'two' ? 'two-page' : 'single';
+                    this.settings.twoPageMode = this.layoutMode === 'two-page';
+                    this.saveSettings();
+                    if (this.rendition) this.rendition.spread(this.layoutMode === 'two-page' ? 'always' : 'none');
+                    document.getElementById('layoutBtn').textContent = this.layoutMode === 'two-page' ? '📖 Two Pages' : '📄 Single Page';
+                });
+                document.getElementById('continuousModeCheckbox').addEventListener('change', (e) => {
+                    this.settings.continuous = e.target.checked;
+                    this.saveSettings();
+                });
+                document.getElementById('resetFontBtn').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.resetFontSettings();
+                });                
+            }
+
+            async handleFileUpload(event) {
+                const files = event.target.files;
+                const uploadBtn = document.querySelector('.upload-btn');
+                const originalText = uploadBtn.textContent;
+                uploadBtn.textContent = '⏳ Processing...'; uploadBtn.disabled = true;
+
+                let successCount = 0;
+                for (let file of files) {
+                    if (file.name.endsWith('.epub')) {
+                        try {
+                            const arrayBuffer = await file.arrayBuffer();
+                            // attempt quick extraction for title/cover
+                            const extracted = await this.extractForLibrary(new Uint8Array(arrayBuffer));
+                            await this.storeEPUBFile(file, extracted);
+                            successCount++;
+                        } catch (error) {
+                            console.error(`Error processing ${file.name}:`, error);
+                        }
+                    }
+                }
+
+                uploadBtn.textContent = originalText; uploadBtn.disabled = false; event.target.value = '';
+                if (successCount > 0) { uploadBtn.textContent = '✓ Uploaded!'; setTimeout(() => { uploadBtn.textContent = originalText; }, 1500); }
+            }
+
+            async extractForLibrary(uint8Array) {
+                // reuse existing unzip logic, but keep simple for library metadata
+                const zip = await this.unzip(uint8Array);
+                const containerXML = new TextDecoder().decode(zip['META-INF/container.xml'] || new Uint8Array());
+                const opfPath = containerXML.match(/full-path="([^"]+)"/)?.[1];
+                if (!opfPath || !zip[opfPath]) throw new Error('Invalid EPUB structure');
+                const opfContent = new TextDecoder().decode(zip[opfPath]);
+                const parser = new DOMParser(); const doc = parser.parseFromString(opfContent, 'text/xml');
+                const getText = (name) => { const el = doc.querySelector(`metadata > ${name}`) || doc.querySelector(`metadata > dc\\:${name}`); return el?.textContent?.trim() || 'Unknown'; };
+                const title = getText('title'); const author = getText('creator');
+                const basePath = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
+                let coverImage = null;
+                const coverId = doc.querySelector('meta[name="cover"]')?.getAttribute('content');
+                if (coverId) {
+                    const coverHref = doc.querySelector(`item[id="${coverId}"]`)?.getAttribute('href');
+                    if (coverHref && zip[basePath + coverHref]) {
+                        const mime = doc.querySelector(`item[id="${coverId}"]`)?.getAttribute('media-type') || 'image/jpeg';
+                        const base64 = this.arrayBufferToBase64(zip[basePath + coverHref]);
+                        coverImage = `data:${mime};base64,${base64}`;
+                    }
+                }
+                return { title, author, coverImage };
+            }
+
+            async unzip(uint8Array) {
+                const files = {};
+                const view = new DataView(uint8Array.buffer);
+                let offset = 0;
+                while (offset < uint8Array.length - 4) {
+                    const sig = view.getUint32(offset, true);
+                    if (sig === 0x04034b50) {
+                        const nameLen = view.getUint16(offset + 26, true);
+                        const extraLen = view.getUint16(offset + 28, true);
+                        const compSize = view.getUint32(offset + 18, true);
+                        const uncompSize = view.getUint32(offset + 22, true);
+                        const method = view.getUint16(offset + 8, true);
+                        const nameStart = offset + 30;
+                        const nameBytes = uint8Array.slice(nameStart, nameStart + nameLen);
+                        const name = new TextDecoder('utf-8').decode(nameBytes);
+                        const dataStart = nameStart + nameLen + extraLen;
+                        let compData = uint8Array.slice(dataStart, dataStart + compSize);
+                        try {
+                            if (method === 0) files[name] = compData;
+                            else if (method === 8) files[name] = await this.inflateData(compData, uncompSize);
+                            else files[name] = compData;
+                        } catch (e) { files[name] = compData; }
+                        offset = dataStart + compSize;
+                    } else offset++;
+                }
+                return files;
+            }
+
+            async inflateData(compressedData, uncompressedSize) {
+                if (typeof DecompressionStream !== 'undefined') {
+                    try {
+                        const ds = new DecompressionStream('deflate-raw');
+                        const writer = ds.writable.getWriter(); writer.write(compressedData); writer.close();
+                        const reader = ds.readable.getReader(); const chunks = []; let totalLength = 0;
+                        while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); totalLength += value.length; }
+                        const result = new Uint8Array(totalLength); let offset = 0; for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.length; }
+                        return result;
+                    } catch (e) { console.warn('DecompressionStream failed, fallback'); }
+                }
+                return this.inflateFallback(compressedData, uncompressedSize);
+            }
+
+            inflateFallback(compressedData, expectedSize) {
+                const output = new Uint8Array(expectedSize || compressedData.length * 3);
+                let inPos = 0, outPos = 0; if (compressedData.length > 2 && (compressedData[0] & 0x0F) === 0x08) inPos = 2;
+                while (inPos < compressedData.length && outPos < output.length) output[outPos++] = compressedData[inPos++];
+                return output.slice(0, outPos);
+            }
+
+            arrayBufferToBase64(buffer) {
+                let binary = ''; const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                return btoa(binary);
+            }
+
+            async storeEPUBFile(file, extractedData) {
+                const arrayBuffer = await file.arrayBuffer(); const uint8Array = new Uint8Array(arrayBuffer);
+                const book = {
+                    id: Date.now().toString() + Math.random(),
+                    title: extractedData.title, author: extractedData.author, coverImage: extractedData.coverImage,
+                    metadata: { fileName: file.name, fileSize: file.size }, progress: 0, dateAdded: new Date().toISOString()
+                };
+                await new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(['epubFiles'], 'readwrite'); const store = transaction.objectStore('epubFiles');
+                    const request = store.put({ id: book.id, data: uint8Array }); request.onsuccess = resolve; request.onerror = () => reject(request.error);
+                });
+                this.books.push(book); this.saveBooks(); this.renderLibrary();
+            }
+
+            async loadEPUBFile(bookId) {
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction(['epubFiles'], 'readonly'); const store = transaction.objectStore('epubFiles');
+                    const request = store.get(bookId); request.onsuccess = () => resolve(request.result?.data); request.onerror = () => reject(request.error);
+                });
+            }
+
+            renderLibrary() {
+                const grid = document.getElementById('bookGrid'); grid.innerHTML = '';
+                if (this.books.length === 0) { grid.innerHTML = '<p style="color:#999;text-align:center;grid-column:1/-1;padding:60px;">No books yet. Upload an EPUB to get started!</p>'; return; }
+                this.books.forEach(book => {
+                    const card = document.createElement('div'); card.className = 'book-card';
+                    const hue = book.title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 360;
+                    const coverHTML = book.coverImage ? `<img src="${book.coverImage}" alt="${book.title}">` : `<span style="font-size:48px;">📖</span>`;
+                    const progress = book.progress > 0 ? `<div style="font-size:12px;color:#4CAF50;margin-top:5px;">${Math.round(book.progress)}% complete</div>` : '';
+                    card.innerHTML = `\n                        <button class="delete-btn" onclick="reader.deleteBook('${book.id}'); event.stopPropagation();">×</button>\n                        <div class="book-cover" style="background: linear-gradient(135deg, hsl(${hue}, 70%, 60%), hsl(${hue + 30}, 70%, 50%))">${coverHTML}</div>\n                        <div class="book-title" title="${book.title}">${book.title}</div>\n                        <div class="book-author">${book.author}</div>\n                        ${progress}\n                    `;
+                    card.addEventListener('click', (e) => { if (!e.target.classList.contains('delete-btn')) { this.openBook(book.id); } });
+                    grid.appendChild(card);
+                });
+            }
+
+            registerThemes() {
+                if (!this.rendition) return;
+                const themes = {
+                    default: {
+                        body: { background: '#ffffff', color: '#000000' }
+                    },
+
+                    gray: {
+                        body: { background: '#d3d3d3', color: '#000000' }
+                    },
+
+                    sepia: {
+                        body: { background: '#f4e1c2', color: '#333333' }
+                    },
+
+                    herbe: {
+                        body: { background: '#d3e4cd', color: '#333333' }
+                    },
+
+                    cerise: {
+                        body: { background: '#f8d7da', color: '#333333' }
+                    },
+
+                    ciel: {
+                        body: { background: '#bde0fe', color: '#333333' }
+                    },
+
+                    solarise: {
+                        body: { background: '#fff5eb', color: '#333333' }
+                    },
+
+                    gruvbox: {
+                        body: { background: '#f9f5d7', color: '#333333' }
+                    },
+
+                    contraste: {
+                        body: { background: '#000000', color: '#ffffff' }
+                    },
+
+                    coucher: {
+                        body: { background: '#fffaf0', color: '#333333' }
+                    },
+
+                    nord: {
+                        body: { background: '#d8dee9', color: '#2e3440' }
+                    }                };
+                Object.keys(themes).forEach(name => this.rendition.themes.register(name, themes[name]));
+                // register a dynamic 'user' theme which we will re-register on changes
+                this.applyUserStyles();
+            }
+
+            applyUserStyles() {
+                if (!this.rendition) return;
+
+                const fs = (this.settings.fontSize || 18) + 'px';
+                const ff = this.settings.fontFamily || "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+                const lh = (this.settings.lineHeight || 1.6);
+                const marginPx = (this.settings.pageMargin || 20) + 'px';
+
+                // CSS that only applies user overrides for typography & margins
+                // keep the selectors minimal so we don't unintentionally override book rules we don't intend to
+                this.userStyleCss = `
+        :root, html, body {
+            font-family: ${ff} !important;
+            font-size: ${fs} !important;
+            line-height: ${lh} !important;
+            padding-left: ${marginPx} !important;
+            padding-right: ${marginPx} !important;
+        }
+        /* optionally override direct elements to increase specificity */
+        body * {
+            font-family: ${ff} !important;
+        }
+    `;
+
+                // If continuous mode requested, set flow; otherwise set spread
+                if (this.settings.continuous) {
+                    try { this.rendition.flow('scrolled-doc'); }
+                    catch (e) { try { this.rendition.flow('scrolled'); } catch (e2) { } }
+                } else {
+                    try { this.rendition.spread(this.layoutMode === 'two-page' ? 'always' : 'none'); }
+                    catch (e) { }
+                }
+
+                // Force re-render of existing views so the hook will inject the style (or update it)
+                try {
+                    // update style for already created views
+                    if (this.rendition && typeof this.rendition.views === 'function') {
+                        this.rendition.views().forEach(view => {
+                            try {
+                                const doc = (view && view.document) || (view && view.contents && view.contents.document);
+                                if (!doc) return;
+                                let styleEl = doc.getElementById('epubjs-user-style');
+                                if (styleEl) {
+                                    styleEl.textContent = this.userStyleCss;
+                                } else {
+                                    const style = doc.createElement('style');
+                                    style.id = 'epubjs-user-style';
+                                    style.type = 'text/css';
+                                    style.appendChild(doc.createTextNode(this.userStyleCss));
+                                    const head = doc.head || doc.getElementsByTagName('head')[0] || doc.documentElement;
+                                    head.appendChild(style);
+                                }
+                            } catch (e) { /* ignore per-view errors */ }
+                        });
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+
+            showLoading(show, text = 'Loading book...', percent = 0, sub = '') {
+                const overlay = document.getElementById('loadingOverlay');
+                const fill = document.getElementById('progressFill');
+                const txt = document.getElementById('loadingText');
+                const subtxt = document.getElementById('loadingSub');
+                if (show) {
+                    overlay.style.display = 'flex'; txt.textContent = text; subtxt.textContent = sub;
+                    fill.style.width = percent + '%';
+                } else {
+                    overlay.style.display = 'none'; fill.style.width = '0%'; txt.textContent = '';
+                }
+            }
+
+            async openBook(bookId) {
+                const bookData = this.books.find(b => b.id === bookId); if (!bookData) return;
+                const uint8Array = await this.loadEPUBFile(bookId);
+                if (!uint8Array) { alert('Could not load book file.'); return; }
+
+                document.getElementById('library').style.display = 'none';
+                const readerEl = document.getElementById('reader'); readerEl.classList.add('active');
+                document.getElementById('readerTitle').textContent = bookData.title;
+                this.currentBook = bookData;
+
+                // show loading UI and update at key stages
+                this.showLoading(true, 'Opening book...', 5, 'Initializing');
+
+                this.book = ePub();
+                // open from bytes
+                this.book.open(uint8Array);
+
+                await this.book.ready; this.showLoading(true, 'Preparing locations...', 30, 'Parsing content');
+
+                // create rendition with user selected flow and spread
+                const flowMode = this.settings.continuous ? (this.settings.continuous === true ? 'scrolled-doc' : 'scrolled-doc') : (this.layoutMode === 'two-page' ? 'paginated' : 'paginated');
+
+                // render
+                this.rendition = this.book.renderTo('epub-viewer', {
+                    width: '100%', height: '100%', flow: flowMode, spread: this.layoutMode === 'two-page' && !this.settings.continuous ? 'always' : 'none'
+                });
+
+                this.showLoading(true, 'Generating locations...', 55, 'Building pagination');
+                try { await this.book.locations.generate(1600); } catch (e) { console.warn('locations.generate failed or not needed', e); }
+                this.showLoading(true, 'Applying theme...', 75, 'Customizing reader');
+
+                this.registerThemes();
+                // ensure theme selection picks user + theme combo
+                if (this.settings.theme) this.rendition.themes.select(this.settings.theme);
+                this.applyUserStyles();
+
+                // display last progress if any
+                if (bookData.progress > 0) {
+                    const target = this.book.locations.cfiFromPercentage(bookData.progress / 100);
+                    await this.rendition.display(target);
+                } else {
+                    await this.rendition.display();
+                }
+
+                this.showLoading(true, 'Finalizing...', 95, 'Rendering');
+
+                this.setupRenditionEvents();
+                this.loadTOC();
+
+                // hide loading after small delay so user sees 100%
+                setTimeout(() => this.showLoading(false), 400);
+            }
+
+            setupRenditionEvents() {
+                const nextBtn = document.getElementById('nextBtn');
+                const prevBtn = document.getElementById('prevBtn');
+                const pageInfo = document.getElementById('pageInfo');
+
+                nextBtn.onclick = () => this.nextPage(); prevBtn.onclick = () => this.previousPage();
+
+                this.rendition.on('relocated', (location) => {
+                    if (!this.currentBook || !this.book) return;
+                    const percentage = Math.round((location.start.percentage || 0) * 100);
+                    pageInfo.textContent = `${percentage}%`;
+                    prevBtn.disabled = location.atStart; nextBtn.disabled = location.atEnd;
+                    this.updateBookProgress(percentage);
+                });
+
+                // highlight current TOC
+                this.rendition.on('rendered', (section) => {
+                    const tocItems = document.querySelectorAll('.toc-item'); tocItems.forEach(item => item.classList.remove('active'));
+                    const current = this.book.navigation.get(section.href);
+                    if (current) {
+                        const activeItem = document.querySelector(`[data-href="${current.href}"]`);
+                        if (activeItem) activeItem.classList.add('active');
+                    }
+                });
+
+                // update styles when contents load (helps override book css)
+                // new hook: inject a <style id="epubjs-user-style"> element per view/document
+                this.rendition.hooks.content.register((contents) => {
+                    // build the CSS once (use this.userStyleCss so applyUserStyles can update it)
+                    const css = this.userStyleCss || '';
+                    try {
+                        // contents.document is the iframe doc in many epub.js versions; contents.contentDocument fallback
+                        const doc = contents.document || contents.contentDocument;
+                        if (!doc) return;
+
+                        let styleEl = doc.getElementById('epubjs-user-style');
+                        if (styleEl) {
+                            // update existing style block
+                            styleEl.textContent = css;
+                        } else {
+                            // create new style block and append to head
+                            styleEl = doc.createElement('style');
+                            styleEl.id = 'epubjs-user-style';
+                            styleEl.type = 'text/css';
+                            styleEl.appendChild(doc.createTextNode(css));
+                            // ensure head exists
+                            const head = doc.head || doc.getElementsByTagName('head')[0] || doc.documentElement;
+                            head.appendChild(styleEl);
+                        }
+                    } catch (err) {
+                        console.warn('Failed to inject user style into contents', err);
+                    }
+                });
+
+
+                // when scrolling mode, update percent on scroll
+                if (this.settings.continuous) {
+                    this.rendition.on('relocated', (location) => {
+                        const percentage = Math.round((location.start.percentage || 0) * 100);
+                        document.getElementById('pageInfo').textContent = percentage + '%';
+                    });
+                }
+            }
+
+            loadTOC() {
+                const tocContent = document.getElementById('tocContent'); tocContent.innerHTML = '';
+                this.book.loaded.navigation.then((toc) => {
+                    toc.forEach(chapter => {
+                        const item = document.createElement('div'); item.className = 'toc-item'; item.textContent = chapter.label; item.dataset.href = chapter.href;
+                        item.onclick = () => { this.rendition.display(chapter.href); document.getElementById('tocPanel').classList.remove('active'); };
+                        tocContent.appendChild(item);
+                    });
+                });
+            }
+
+            handleKeyboard(e) {
+                if (!document.getElementById('reader').classList.contains('active')) return;
+                if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); this.previousPage(); }
+                else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); this.nextPage(); }
+                else if (e.key === 'f' || e.key === 'F') { e.preventDefault(); this.toggleFullscreen(); }
+                else if (e.key === 'l' || e.key === 'L') { e.preventDefault(); this.toggleLayout(); }
+                else if (e.key === 'Escape') {
+                    const settingsPanel = document.getElementById('settingsPanel'); const tocPanel = document.getElementById('tocPanel');
+                    if (settingsPanel.classList.contains('active')) settingsPanel.classList.remove('active');
+                    else if (tocPanel.classList.contains('active')) tocPanel.classList.remove('active');
+                    else if (this.isFullscreen) this.toggleFullscreen();
+                    else this.closeReader();
+                }
+            }
+
+            previousPage() { try { if (this.rendition) this.rendition.prev(); } catch (e) { } }
+            nextPage() { try { if (this.rendition) this.rendition.next(); } catch (e) { } }
+
+            toggleLayout() {
+                this.layoutMode = this.layoutMode === 'single' ? 'two-page' : 'single';
+                this.settings.twoPageMode = this.layoutMode === 'two-page'; this.saveSettings();
+                document.getElementById('layoutBtn').textContent = this.layoutMode === 'two-page' ? '📖 Two Pages' : '📄 Single Page';
+                if (this.rendition && !this.settings.continuous) this.rendition.spread(this.layoutMode === 'two-page' ? 'always' : 'none');
+            }
+
+            async toggleFullscreen() {
+                const reader = document.getElementById('reader');
+                if (!this.isFullscreen) {
+                    if (reader.requestFullscreen) await reader.requestFullscreen(); else if (reader.webkitRequestFullscreen) await reader.webkitRequestFullscreen();
+                    this.isFullscreen = true; reader.classList.add('fullscreen-hide');
+                    // hide UI immediately in fullscreen
+                    setTimeout(() => { reader.classList.add('fullscreen-hide'); }, 50);
+                    document.getElementById('clickZones').style.display = 'flex'; document.getElementById('clickZones').style.pointerEvents = 'auto';
+                } else {
+                    if (document.exitFullscreen) await document.exitFullscreen(); else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+                    this.isFullscreen = false; reader.classList.remove('fullscreen-hide');
+                    document.getElementById('clickZones').style.display = 'none'; document.getElementById('clickZones').style.pointerEvents = 'none';
+                    // ensure panels hidden
+                    document.getElementById('settingsPanel').classList.remove('active'); document.getElementById('tocPanel').classList.remove('active');
+                }
+            }
+
+            toggleTOC() { document.getElementById('tocPanel').classList.toggle('active'); }
+            toggleSettings() { document.getElementById('settingsPanel').classList.toggle('active'); }
+
+            setTheme(theme) { this.settings.theme = theme; this.saveSettings(); document.querySelectorAll('.theme-btn').forEach(btn => { btn.classList.remove('active'); if (btn.dataset.theme === theme) btn.classList.add('active'); }); if (this.rendition) this.rendition.themes.select(theme); }
+
+            updateBookProgress(progress) { if (!this.currentBook) return; const bookIndex = this.books.findIndex(b => b.id === this.currentBook.id); if (bookIndex !== -1) { this.books[bookIndex].progress = progress; this.saveBooks(); } }
+
+            resetFontSettings() {
+                // Clear only the font-related settings so other settings persist
+                this.settings.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+                this.settings.fontSize = 18;
+                this.settings.lineHeight = 1.6;
+                this.settings.pageMargin = 20;
+                // persist
+                this.saveSettings();
+
+                // Remove injected style element from every rendered view document so inner epub CSS takes over
+                if (this.rendition && typeof this.rendition.views === 'function') {
+                    this.rendition.views().forEach(view => {
+                        try {
+                            const doc = (view && view.document) || (view && view.contents && view.contents.document);
+                            if (!doc) return;
+                            const el = doc.getElementById('epubjs-user-style');
+                            if (el && el.parentNode) el.parentNode.removeChild(el);
+                        } catch (e) {
+                            console.warn('Failed to remove user style from view', e);
+                        }
+                    });
+
+                    // Remove stored userStyleCss so future hooks don't re-inject it until applyUserStyles is called again
+                    this.userStyleCss = '';
+
+                    // Re-display current location to let book CSS reapply cleanly
+                    try { this.rendition.display(); } catch (e) { console.warn('Error re-displaying rendition after reset', e); }
+                }
+
+                // Update UI so sliders and selects reflect the reset values
+                this.hydrateSettingsUI();
+            }
+
+
+            closeReader() {
+                if (this.isFullscreen) this.toggleFullscreen();
+                document.getElementById('reader').classList.remove('active'); document.getElementById('library').style.display = 'block';
+                document.getElementById('settingsPanel').classList.remove('active'); document.getElementById('tocPanel').classList.remove('active');
+                if (this.rendition) { try { this.rendition.destroy(); } catch (e) { } this.rendition = null; }
+                if (this.book) { try { this.book.destroy(); } catch (e) { } this.book = null; }
+                this.currentBook = null;
+            }
+
+            deleteBook(bookId) {
+                if (confirm('Delete this book?')) {
+                    if (this.currentBook?.id === bookId) this.closeReader();
+                    const transaction = this.db.transaction(['epubFiles'], 'readwrite'); transaction.objectStore('epubFiles').delete(bookId);
+                    this.books = this.books.filter(b => b.id !== bookId); this.saveBooks(); this.renderLibrary();
+                }
+            }
+
+            hydrateSettingsUI() {
+                document.getElementById('fontSizeRange').value = this.settings.fontSize;
+                document.getElementById('fontSizeVal').textContent = this.settings.fontSize;
+                document.getElementById('lineHeightRange').value = this.settings.lineHeight;
+                document.getElementById('lineHeightVal').textContent = this.settings.lineHeight;
+                document.getElementById('fontFamilySelect').value = this.settings.fontFamily;
+                document.getElementById('pageMarginSelect').value = this.settings.pageMargin;
+                document.getElementById('pageSpreadSelect').value = this.settings.twoPageMode ? 'two' : 'single';
+                document.getElementById('continuousModeCheckbox').checked = !!this.settings.continuous;
+                document.getElementById('layoutBtn').textContent = this.layoutMode === 'two-page' ? '📖 Two Pages' : '📄 Single Page';
+                // set theme button active
+                document.querySelectorAll('.theme-btn').forEach(btn => { if (btn.dataset.theme === this.settings.theme) btn.classList.add('active'); else btn.classList.remove('active'); });
+            }
+
+            // handle clicks inside the viewer for full-screen behaviors
+            handleViewerClick(e) {
+                if (!this.isFullscreen) return;
+                const readerEl = document.getElementById('reader');
+                const rect = document.getElementById('epub-viewer').getBoundingClientRect();
+                const x = e.clientX - rect.left; const w = rect.width; const zone = x / w;
+
+                // if UI currently hidden, left/right zones navigate; center toggles UI
+                if (readerEl.classList.contains('fullscreen-hide')) {
+                    if (zone < 0.28) { this.previousPage(); }
+                    else if (zone > 0.72) { this.nextPage(); }
+                    else {
+                        // show UI temporarily
+                        readerEl.classList.remove('fullscreen-hide');
+                        setTimeout(() => { if (this.isFullscreen) readerEl.classList.add('fullscreen-hide'); }, 3500);
+                    }
+                } else {
+                    // if UI is visible, clicking middle toggles hide
+                    readerEl.classList.add('fullscreen-hide');
+                }
+            }
+        }
+
+        const reader = new EPUBReader();
+        function closeReader() { reader.closeReader(); }
+        function previousPage() { reader.previousPage(); }
+        function nextPage() { reader.nextPage(); }
+        function toggleSettings() { reader.toggleSettings(); }
+        function toggleTOC() { reader.toggleTOC(); }
+        function toggleLayout() { reader.toggleLayout(); }
+        function toggleFullscreen() { reader.toggleFullscreen(); }
+        function setTheme(theme) { reader.setTheme(theme); }
+    </script>
+</body>
+
+</html>
