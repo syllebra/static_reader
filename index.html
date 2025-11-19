@@ -144,6 +144,8 @@
             display: none;
             height: 100vh;
             flex-direction: column;
+            position: relative; /* Added for positioning context */
+            overflow: hidden; /* Prevent scrollbars */
         }
 
         .reader.active {
@@ -151,15 +153,22 @@
         }
 
         .reader-header {
-            background: #252525;
-            padding: 15px 20px;
+            background: linear-gradient(to bottom, rgba(37, 37, 37, 0.95) 0%, rgba(37, 37, 37, 0.65) 70%, transparent 100%);
+            padding: 15px 20px 45px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #333;
+            border-bottom: none; /* Remove solid border */
             flex-shrink: 0;
-            transition: transform 0.25s, opacity 0.2s;
+            position: absolute; /* Overlay positioning */
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 2000;
+            transform: translateY(0);
+            transition: transform 0.3s ease-out; /* Smooth slide animation */
         }
+
 
         .reader-title {
             font-size: 18px;
@@ -199,7 +208,7 @@
             background: #2a2a2a;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
             transition: transform 0.3s;
-            z-index: 1000;
+            z-index: 2000;
             overflow-y: auto;
             padding: 20px;
             box-sizing: border-box;
@@ -303,21 +312,29 @@
             -ms-user-select: none;
             user-select: none;
             overflow: hidden;
-            pointer-events: none;
+            pointer-events: auto ;
         }
 
         .navigation {
-            position: sticky;
+            position: absolute; /* Overlay positioning */
             bottom: 0;
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            align-items: center;
-            background: #252525;
-            padding: 15px;
-            border-top: 1px solid #333;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(37, 37, 37, 0.95) 0%, rgba(37, 37, 37, 0.65) 70%, transparent 100%);
+            padding: 45px 15px 15px 15px;
+            border-top: none; /* Remove solid border */
             flex-shrink: 0;
-            transition: transform 0.25s, opacity 0.2s;
+            z-index: 2000;
+            transform: translateY(0);
+            transition: transform 0.3s ease-out; /* Smooth slide animation */
+        }
+
+        .reader.fullscreen-hide .reader-header {
+            transform: translateY(-100%);
+        }
+
+        .reader.fullscreen-hide .navigation {
+            transform: translateY(100%);
         }
 
         .nav-btn {
@@ -389,12 +406,12 @@
         }
 
         /* Fullscreen UI hiding */
-        .reader.fullscreen-hide .reader-header,
+        /* .reader.fullscreen-hide .reader-header,
         .reader.fullscreen-hide .navigation,
         .reader.fullscreen-hide .toc-panel,
         .reader.fullscreen-hide .settings-panel {
             display: none !important;
-        }
+        } */
 
         /* Click areas overlay for full-screen reading (invisible but catch clicks) */
         .click-zones {
@@ -406,8 +423,30 @@
 
         .zone {
             flex: 1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
+        #zoneLeft:hover {
+            opacity: 0.7;
+            background: linear-gradient(to right, 
+                rgba(255, 255, 255, 0.8) 0%, 
+                transparent 70%);
+        }
+
+        #zoneCenter:hover {
+            opacity: 0.5;
+            background: radial-gradient(ellipse at center, 
+                rgba(255, 255, 255, 0.75) 0%, 
+                transparent 60%);
+        }
+
+        #zoneRight:hover {
+            opacity: 0.7;
+            background: linear-gradient(to left, 
+                rgba(255, 255, 255, 0.8) 0%, 
+                transparent 70%);
+        }
         @media (max-width:768px) {
 
             .settings-panel,
@@ -443,7 +482,13 @@
                 </div>
             </div>
 
-            <div id="epub-viewer"></div>
+            <div id="epub-viewer">
+                <div class="click-zones" id="clickZones">
+                    <div class="zone" id="zoneLeft"></div>
+                    <div class="zone" id="zoneCenter"></div>
+                    <div class="zone" id="zoneRight"></div>
+                    </div>
+                </div>
 
             <div class="navigation">
                 <button class="nav-btn" id="prevBtn" onclick="previousPage()">← Previous</button>
@@ -563,13 +608,6 @@
                 </div>
             </div>
 
-            <!-- Click zones for full-screen reading (invisible) -->
-            <div class="click-zones" id="clickZones" style="pointer-events:none; display:none;">
-                <div class="zone" id="zoneLeft"></div>
-                <div class="zone" id="zoneCenter"></div>
-                <div class="zone" id="zoneRight"></div>
-            </div>
-
         </div>
     </div>
 
@@ -644,10 +682,7 @@
                 document.addEventListener('keydown', (e) => this.handleKeyboard(e));
                 window.addEventListener('resize', () => { if (this.rendition) this.rendition.resize(); });
 
-                // Click handling for full-screen read zones
-                const viewer = document.getElementById('epub-viewer');
-                viewer.addEventListener('click', (e) => this.handleViewerClick(e));
-
+                
                 // settings UI
                 document.getElementById('fontSizeRange').addEventListener('input', (e) => {
                     document.getElementById('fontSizeVal').textContent = e.target.value;
@@ -684,6 +719,32 @@
                     e.preventDefault();
                     this.resetFontSettings();
                 });                
+
+                document.getElementById('zoneLeft').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.previousPage();
+                });    
+
+                document.getElementById('zoneRight').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.nextPage();
+                });    
+                
+                document.getElementById('zoneCenter').addEventListener('click', (e) => this.handleViewerClick(e));
+
+                if (document.addEventListener) {
+                    document.addEventListener('fullscreenchange', exitHandler, false);
+                    document.addEventListener('mozfullscreenchange', exitHandler, false);
+                    document.addEventListener('MSFullscreenChange', exitHandler, false);
+                    document.addEventListener('webkitfullscreenchange', exitHandler, false);
+                }
+
+                function exitHandler() {
+                    if (!document.webkitIsFullScreen && !document.mozFullScreen && !document.msFullscreenElement) {
+                        // Run code on exit
+                        toggleFullscreen();
+                    }
+                }                
             }
 
             async handleFileUpload(event) {
@@ -1104,20 +1165,20 @@
             async toggleFullscreen() {
                 const reader = document.getElementById('reader');
                 if (!this.isFullscreen) {
-                    if (reader.requestFullscreen) await reader.requestFullscreen(); else if (reader.webkitRequestFullscreen) await reader.webkitRequestFullscreen();
-                    this.isFullscreen = true; reader.classList.add('fullscreen-hide');
-                    // hide UI immediately in fullscreen
+                    if (reader.requestFullscreen) await reader.requestFullscreen();
+                    else if (reader.webkitRequestFullscreen) await reader.webkitRequestFullscreen();
+                    this.isFullscreen = true;
+                    // Add hide class after a brief delay for smoother transition
                     setTimeout(() => { reader.classList.add('fullscreen-hide'); }, 50);
-                    document.getElementById('clickZones').style.display = 'flex'; document.getElementById('clickZones').style.pointerEvents = 'auto';
                 } else {
-                    if (document.exitFullscreen) await document.exitFullscreen(); else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-                    this.isFullscreen = false; reader.classList.remove('fullscreen-hide');
-                    document.getElementById('clickZones').style.display = 'none'; document.getElementById('clickZones').style.pointerEvents = 'none';
-                    // ensure panels hidden
-                    document.getElementById('settingsPanel').classList.remove('active'); document.getElementById('tocPanel').classList.remove('active');
+                    this.isFullscreen = false;
+                    reader.classList.remove('fullscreen-hide');
+                    // Ensure panels are also closed when exiting fullscreen
+                    document.getElementById('settingsPanel').classList.remove('active');
+                    document.getElementById('tocPanel').classList.remove('active');
                 }
             }
-
+            
             toggleTOC() { document.getElementById('tocPanel').classList.toggle('active'); }
             toggleSettings() { document.getElementById('settingsPanel').classList.toggle('active'); }
 
@@ -1192,20 +1253,11 @@
 
             // handle clicks inside the viewer for full-screen behaviors
             handleViewerClick(e) {
-                if (!this.isFullscreen) return;
                 const readerEl = document.getElementById('reader');
-                const rect = document.getElementById('epub-viewer').getBoundingClientRect();
-                const x = e.clientX - rect.left; const w = rect.width; const zone = x / w;
 
                 // if UI currently hidden, left/right zones navigate; center toggles UI
                 if (readerEl.classList.contains('fullscreen-hide')) {
-                    if (zone < 0.28) { this.previousPage(); }
-                    else if (zone > 0.72) { this.nextPage(); }
-                    else {
-                        // show UI temporarily
-                        readerEl.classList.remove('fullscreen-hide');
-                        setTimeout(() => { if (this.isFullscreen) readerEl.classList.add('fullscreen-hide'); }, 3500);
-                    }
+                    readerEl.classList.remove('fullscreen-hide');
                 } else {
                     // if UI is visible, clicking middle toggles hide
                     readerEl.classList.add('fullscreen-hide');
