@@ -144,8 +144,8 @@
             display: none;
             height: 100vh;
             flex-direction: column;
-            position: relative; /* Added for positioning context */
-            overflow: hidden; /* Prevent scrollbars */
+            position: relative;
+            overflow: hidden;
         }
 
         .reader.active {
@@ -158,17 +158,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: none; /* Remove solid border */
+            border-bottom: none;
             flex-shrink: 0;
-            position: absolute; /* Overlay positioning */
+            position: absolute;
             top: 0;
             left: 0;
             right: 0;
             z-index: 2000;
             transform: translateY(0);
-            transition: transform 0.3s ease-out; /* Smooth slide animation */
+            transition: transform 0.3s ease-out;
         }
-
 
         .reader-title {
             font-size: 18px;
@@ -312,21 +311,21 @@
             -ms-user-select: none;
             user-select: none;
             overflow: hidden;
-            pointer-events: auto ;
+            pointer-events: auto;
         }
 
         .navigation {
-            position: absolute; /* Overlay positioning */
+            position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
             background: linear-gradient(to top, rgba(37, 37, 37, 0.95) 0%, rgba(37, 37, 37, 0.65) 70%, transparent 100%);
             padding: 45px 15px 15px 15px;
-            border-top: none; /* Remove solid border */
+            border-top: none;
             flex-shrink: 0;
             z-index: 2000;
             transform: translateY(0);
-            transition: transform 0.3s ease-out; /* Smooth slide animation */
+            transition: transform 0.3s ease-out;
         }
 
         .reader.fullscreen-hide .reader-header {
@@ -405,18 +404,10 @@
             transition: width 0.25s ease;
         }
 
-        /* Fullscreen UI hiding */
-        /* .reader.fullscreen-hide .reader-header,
-        .reader.fullscreen-hide .navigation,
-        .reader.fullscreen-hide .toc-panel,
-        .reader.fullscreen-hide .settings-panel {
-            display: none !important;
-        } */
-
-        /* Click areas overlay for full-screen reading (invisible but catch clicks) */
+        /* Click areas overlay for full-screen reading */
         .click-zones {
             position: absolute;
-            inset: 0;
+            inset: 20px;
             display: flex;
             z-index: 1400;
         }
@@ -429,24 +420,71 @@
 
         #zoneLeft:hover {
             opacity: 0.7;
-            background: linear-gradient(to right, 
-                rgba(255, 255, 255, 0.8) 0%, 
-                transparent 70%);
+            background: linear-gradient(to right,
+                    rgba(255, 255, 255, 0.8) 0%,
+                    transparent 70%);
         }
 
         #zoneCenter:hover {
             opacity: 0.5;
-            background: radial-gradient(ellipse at center, 
-                rgba(255, 255, 255, 0.75) 0%, 
-                transparent 60%);
+            background: radial-gradient(ellipse at center,
+                    rgba(255, 255, 255, 0.75) 0%,
+                    transparent 60%);
         }
 
         #zoneRight:hover {
             opacity: 0.7;
-            background: linear-gradient(to left, 
-                rgba(255, 255, 255, 0.8) 0%, 
-                transparent 70%);
+            background: linear-gradient(to left,
+                    rgba(255, 255, 255, 0.8) 0%,
+                    transparent 70%);
         }
+
+        /* Reading info overlay - Single line, theme-aware, persistent */
+        .reading-info-overlay {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(37, 37, 37, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 8px 24px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            opacity: 0.8;
+        }
+
+        .info-part {
+            color: inherit;
+            /* Set by JavaScript based on theme */
+        }
+
+        .info-main {
+            font-weight: 600;
+        }
+
+        .info-detail {
+            opacity: 0.9;
+        }
+
+        .info-chapter {
+            opacity: 0.8;
+        }
+
+        @media (max-width: 600px) {
+            .reading-info-overlay {
+                bottom: 20px;
+                padding: 6px 16px;
+                font-size: 12px;
+                gap: 8px;
+            }
+        }
+
         @media (max-width:768px) {
 
             .settings-panel,
@@ -487,8 +525,14 @@
                     <div class="zone" id="zoneLeft"></div>
                     <div class="zone" id="zoneCenter"></div>
                     <div class="zone" id="zoneRight"></div>
-                    </div>
                 </div>
+                <!-- Reading info overlay - single line, theme-aware, persistent -->
+                <div class="reading-info-overlay" id="readingInfoOverlay">
+                    <span class="info-part info-main" id="percentageInfo">0%</span>
+                    <span class="info-part info-detail" id="pageNumbersInfo">Page 0 of 0</span>
+                    <span class="info-part info-chapter" id="chapterInfo"></span>
+                </div>
+            </div>
 
             <div class="navigation">
                 <button class="nav-btn" id="prevBtn" onclick="previousPage()">← Previous</button>
@@ -507,34 +551,34 @@
                     <div class="theme-grid">
                         <button class="theme-btn" data-theme="default" style="background:#fff;color:#000"
                             onclick="setTheme('default')">Default</button>
-                    
+
                         <button class="theme-btn" data-theme="gray" style="background:#d3d3d3;color:#000"
                             onclick="setTheme('gray')">Gray</button>
-                    
+
                         <button class="theme-btn" data-theme="sepia" style="background:#f4e1c2;color:#333"
                             onclick="setTheme('sepia')">Sepia</button>
-                    
+
                         <button class="theme-btn" data-theme="herbe" style="background:#d3e4cd;color:#333"
                             onclick="setTheme('herbe')">Herbe</button>
-                    
+
                         <button class="theme-btn" data-theme="cerise" style="background:#f8d7da;color:#333"
                             onclick="setTheme('cerise')">Cerise</button>
-                    
+
                         <button class="theme-btn" data-theme="ciel" style="background:#bde0fe;color:#333"
                             onclick="setTheme('ciel')">Ciel</button>
-                    
+
                         <button class="theme-btn" data-theme="solarise" style="background:#fff5eb;color:#333"
                             onclick="setTheme('solarise')">Solarisé</button>
-                    
+
                         <button class="theme-btn" data-theme="gruvbox" style="background:#f9f5d7;color:#333"
                             onclick="setTheme('gruvbox')">Gruvbox</button>
-                    
+
                         <button class="theme-btn" data-theme="contraste" style="background:#000;color:#fff"
                             onclick="setTheme('contraste')">Contraste</button>
-                    
+
                         <button class="theme-btn" data-theme="coucher" style="background:#fffaf0;color:#333"
                             onclick="setTheme('coucher')">Coucher</button>
-                    
+
                         <button class="theme-btn" data-theme="nord" style="background:#d8dee9;color:#2e3440"
                             onclick="setTheme('nord')">Nord</button>
                     </div>
@@ -632,6 +676,21 @@
                 this.db = null;
                 this.loadingInterval = null;
 
+                // Theme colors for overlay
+                this.themeColors = {
+                    default: { bg: '#ffffff', color: '#000000' },
+                    gray: { bg: '#d3d3d3', color: '#000000' },
+                    sepia: { bg: '#f4e1c2', color: '#333333' },
+                    herbe: { bg: '#d3e4cd', color: '#333333' },
+                    cerise: { bg: '#f8d7da', color: '#333333' },
+                    ciel: { bg: '#bde0fe', color: '#333333' },
+                    solarise: { bg: '#fff5eb', color: '#333333' },
+                    gruvbox: { bg: '#f9f5d7', color: '#333333' },
+                    contraste: { bg: '#000000', color: '#ffffff' },
+                    coucher: { bg: '#fffaf0', color: '#333333' },
+                    nord: { bg: '#d8dee9', color: '#2e3440' }
+                };
+
                 this.init();
             }
 
@@ -654,7 +713,7 @@
             }
 
             saveSettings() {
-                try { localStorage.setItem('epubSettings', JSON.stringify(this.settings)); } catch (e) { console.error('Failed to save settings:', e); }
+                try { localStorage.setItem('epubSettings', JSON.stringify(this.settings)); } catch (e) { console.error('Failed to save settings', e); }
             }
 
             async init() {
@@ -682,7 +741,6 @@
                 document.addEventListener('keydown', (e) => this.handleKeyboard(e));
                 window.addEventListener('resize', () => { if (this.rendition) this.rendition.resize(); });
 
-                
                 // settings UI
                 document.getElementById('fontSizeRange').addEventListener('input', (e) => {
                     document.getElementById('fontSizeVal').textContent = e.target.value;
@@ -718,18 +776,18 @@
                 document.getElementById('resetFontBtn').addEventListener('click', (e) => {
                     e.preventDefault();
                     this.resetFontSettings();
-                });                
+                });
 
                 document.getElementById('zoneLeft').addEventListener('click', (e) => {
                     e.preventDefault();
                     this.previousPage();
-                });    
+                });
 
                 document.getElementById('zoneRight').addEventListener('click', (e) => {
                     e.preventDefault();
                     this.nextPage();
-                });    
-                
+                });
+
                 document.getElementById('zoneCenter').addEventListener('click', (e) => this.handleViewerClick(e));
 
                 if (document.addEventListener) {
@@ -744,7 +802,7 @@
                         // Run code on exit
                         toggleFullscreen();
                     }
-                }                
+                }
             }
 
             async handleFileUpload(event) {
@@ -931,7 +989,8 @@
 
                     nord: {
                         body: { background: '#d8dee9', color: '#2e3440' }
-                    }                };
+                    }
+                };
                 Object.keys(themes).forEach(name => this.rendition.themes.register(name, themes[name]));
                 // register a dynamic 'user' theme which we will re-register on changes
                 this.applyUserStyles();
@@ -1043,6 +1102,7 @@
                 this.registerThemes();
                 // ensure theme selection picks user + theme combo
                 if (this.settings.theme) this.rendition.themes.select(this.settings.theme);
+                this.applyThemeToOverlay(this.settings.theme); // Apply colors to overlay
                 this.applyUserStyles();
 
                 // display last progress if any
@@ -1065,15 +1125,30 @@
             setupRenditionEvents() {
                 const nextBtn = document.getElementById('nextBtn');
                 const prevBtn = document.getElementById('prevBtn');
-                const pageInfo = document.getElementById('pageInfo');
 
-                nextBtn.onclick = () => this.nextPage(); prevBtn.onclick = () => this.previousPage();
+                nextBtn.onclick = () => this.nextPage();
+                prevBtn.onclick = () => this.previousPage();
 
                 this.rendition.on('relocated', (location) => {
                     if (!this.currentBook || !this.book) return;
+
+                    // Get location data
+                    const currentLocation = this.book.locations.locationFromCfi(location.start.cfi);
+                    const totalLocations = this.book.locations.total;
                     const percentage = Math.round((location.start.percentage || 0) * 100);
-                    pageInfo.textContent = `${percentage}%`;
-                    prevBtn.disabled = location.atStart; nextBtn.disabled = location.atEnd;
+
+                    // Update overlay elements
+                    document.getElementById('percentageInfo').textContent = `${percentage}%`;
+                    document.getElementById('pageNumbersInfo').textContent = `Page ${currentLocation} of ${totalLocations}`;
+
+                    // Calculate and display pages left in chapter
+                    this.updateChapterInfo(currentLocation, totalLocations);
+
+                    // Update button states
+                    prevBtn.disabled = location.atStart;
+                    nextBtn.disabled = location.atEnd;
+
+                    // Save progress
                     this.updateBookProgress(percentage);
                 });
 
@@ -1087,27 +1162,20 @@
                     }
                 });
 
-                // update styles when contents load (helps override book css)
-                // new hook: inject a <style id="epubjs-user-style"> element per view/document
+                // update styles when contents load
                 this.rendition.hooks.content.register((contents) => {
-                    // build the CSS once (use this.userStyleCss so applyUserStyles can update it)
                     const css = this.userStyleCss || '';
                     try {
-                        // contents.document is the iframe doc in many epub.js versions; contents.contentDocument fallback
                         const doc = contents.document || contents.contentDocument;
                         if (!doc) return;
-
                         let styleEl = doc.getElementById('epubjs-user-style');
                         if (styleEl) {
-                            // update existing style block
                             styleEl.textContent = css;
                         } else {
-                            // create new style block and append to head
                             styleEl = doc.createElement('style');
                             styleEl.id = 'epubjs-user-style';
                             styleEl.type = 'text/css';
                             styleEl.appendChild(doc.createTextNode(css));
-                            // ensure head exists
                             const head = doc.head || doc.getElementsByTagName('head')[0] || doc.documentElement;
                             head.appendChild(styleEl);
                         }
@@ -1115,14 +1183,58 @@
                         console.warn('Failed to inject user style into contents', err);
                     }
                 });
+            }
 
+            updateChapterInfo(currentLocation, totalLocations) {
+                const chapterInfoEl = document.getElementById('chapterInfo');
 
-                // when scrolling mode, update percent on scroll
-                if (this.settings.continuous) {
-                    this.rendition.on('relocated', (location) => {
-                        const percentage = Math.round((location.start.percentage || 0) * 100);
-                        document.getElementById('pageInfo').textContent = percentage + '%';
-                    });
+                try {
+                    const tocItems = this.book.navigation.toc;
+                    if (!tocItems || tocItems.length === 0) {
+                        chapterInfoEl.textContent = '';
+                        return;
+                    }
+
+                    let currentChapter = null;
+                    let nextChapterLocation = totalLocations;
+
+                    for (let i = 0; i < tocItems.length; i++) {
+                        const chapter = tocItems[i];
+                        if (!chapter.href) continue;
+
+                        try {
+                            const chapterCfi = this.book.spine.get(chapter.href).cfi;
+                            const chapterLocation = this.book.locations.locationFromCfi(chapterCfi);
+
+                            if (chapterLocation <= currentLocation) {
+                                currentChapter = { ...chapter, location: chapterLocation };
+
+                                if (i + 1 < tocItems.length) {
+                                    const nextChapter = tocItems[i + 1];
+                                    if (nextChapter.href) {
+                                        const nextCfi = this.book.spine.get(nextChapter.href).cfi;
+                                        nextChapterLocation = this.book.locations.locationFromCfi(nextCfi);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Error processing chapter:', e);
+                        }
+                    }
+
+                    if (currentChapter) {
+                        const pagesLeft = Math.max(0, nextChapterLocation - currentLocation);
+                        if (pagesLeft > 0) {
+                            chapterInfoEl.textContent = `• ${pagesLeft} pages left`;
+                        } else {
+                            chapterInfoEl.textContent = '• Final chapter';
+                        }
+                    } else {
+                        chapterInfoEl.textContent = '';
+                    }
+                } catch (e) {
+                    console.warn('Error updating chapter info:', e);
+                    chapterInfoEl.textContent = '';
                 }
             }
 
@@ -1178,11 +1290,33 @@
                     document.getElementById('tocPanel').classList.remove('active');
                 }
             }
-            
+
             toggleTOC() { document.getElementById('tocPanel').classList.toggle('active'); }
             toggleSettings() { document.getElementById('settingsPanel').classList.toggle('active'); }
 
-            setTheme(theme) { this.settings.theme = theme; this.saveSettings(); document.querySelectorAll('.theme-btn').forEach(btn => { btn.classList.remove('active'); if (btn.dataset.theme === theme) btn.classList.add('active'); }); if (this.rendition) this.rendition.themes.select(theme); }
+            applyThemeToOverlay(theme) {
+                const colors = this.themeColors[theme] || this.themeColors.default;
+                const overlay = document.getElementById('readingInfoOverlay');
+                overlay.style.color = colors.color;
+                // Convert hex to rgba for background
+                const r = parseInt(colors.bg.slice(1, 3), 16);
+                const g = parseInt(colors.bg.slice(3, 5), 16);
+                const b = parseInt(colors.bg.slice(5, 7), 16);
+                overlay.style.background = `rgba(${r}, ${g}, ${b}, 0.85)`;
+            }
+
+            setTheme(theme) {
+                this.settings.theme = theme;
+                this.saveSettings();
+                document.querySelectorAll('.theme-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.dataset.theme === theme) btn.classList.add('active');
+                });
+                if (this.rendition) {
+                    this.rendition.themes.select(theme);
+                    this.applyThemeToOverlay(theme);
+                }
+            }
 
             updateBookProgress(progress) { if (!this.currentBook) return; const bookIndex = this.books.findIndex(b => b.id === this.currentBook.id); if (bookIndex !== -1) { this.books[bookIndex].progress = progress; this.saveBooks(); } }
 
